@@ -99,8 +99,8 @@ typedef struct {
     GADAPTER_REMOVE_SOURCE fp_remove;     // to remove device from event sources
 } GADAPTER_CALLBACKS;
 
-struct gadapter_device * gadapter_open(const char * port, unsigned int baudrate, const GADAPTER_CALLBACKS * callbacks);
-int gadapter_send(void * user, unsigned char type, const unsigned char * data, unsigned int count);
-int gadapter_close(void * user);
+struct gadapter_device * gadapter_open(const char * port, unsigned int baudrate, void * user, const GADAPTER_CALLBACKS * callbacks);
+int gadapter_send(struct gadapter_device * device, unsigned char type, const unsigned char * data, unsigned int count);
+int gadapter_close(struct gadapter_device * device);
 
 #endif /* GADAPTER_H_ */

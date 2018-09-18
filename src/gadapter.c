@@ -19,6 +19,7 @@ struct gadapter_device {
   s_ga_packet packet;
   unsigned int bread;
   struct gserial_device * serial;
+  void * user;
   GADAPTER_READ_CALLBACK read_callback;
   GADAPTER_WRITE_CALLBACK write_callback;
   GADAPTER_CLOSE_CALLBACK close_callback;
@@ -27,7 +28,7 @@ struct gadapter_device {
 
 GLIST_INST(struct gadapter_device, adapter_devices, gadapter_close)
 
-static int adapter_recv(void * user, const void * buf, int status) {
+static int read_callback(void * user, const void * buf, int status) {
 
   struct gadapter_device * device = (struct gadapter_device *) user;
 
@@ -73,9 +74,7 @@ static int adapter_recv(void * user, const void * buf, int status) {
   return ret;
 }
 
-int gadapter_send(void * user, unsigned char type, const unsigned char * data, unsigned int count) {
-
-  struct gadapter_device * device = (struct gadapter_device *) user;
+int gadapter_send(struct gadapter_device * device, unsigned char type, const unsigned char * data, unsigned int count) {
 
   if (count != 0 && data == NULL) {
     PRINT_ERROR_OTHER("data is NULL")
@@ -105,7 +104,21 @@ int gadapter_send(void * user, unsigned char type, const unsigned char * data, u
   return 0;
 }
 
-struct gadapter_device * gadapter_open(const char * port, unsigned int baudrate, const GADAPTER_CALLBACKS * callbacks) {
+static int close_callback(void * user) {
+
+    struct gadapter_device * device = (struct gadapter_device *) user;
+
+    return device->close_callback(device->user);
+}
+
+static int write_callback(void * user, int transfered) {
+
+    struct gadapter_device * device = (struct gadapter_device *) user;
+
+    return device->write_callback(device->user, transfered);
+}
+
+struct gadapter_device * gadapter_open(const char * port, unsigned int baudrate, void * user, const GADAPTER_CALLBACKS * callbacks) {
 
   if (callbacks->fp_register == NULL) {
     PRINT_ERROR_OTHER("fp_register is NULL")
@@ -134,9 +147,9 @@ struct gadapter_device * gadapter_open(const char * port, unsigned int baudrate,
   }
 
   GSERIAL_CALLBACKS serial_callbacks = {
-    .fp_read = adapter_recv,
-    .fp_write = callbacks->fp_write,
-    .fp_close = gadapter_close,
+    .fp_read = read_callback,
+    .fp_write = write_callback,
+    .fp_close = close_callback,
     .fp_register = callbacks->fp_register,
     .fp_remove = callbacks->fp_remove
   };
@@ -148,6 +161,7 @@ struct gadapter_device * gadapter_open(const char * port, unsigned int baudrate,
     return NULL;
   }
 
+  device->user = user;
   device->serial = serial;
   device->read_callback = callbacks->fp_read;
   device->write_callback = callbacks->fp_write;
@@ -158,9 +172,7 @@ struct gadapter_device * gadapter_open(const char * port, unsigned int baudrate,
   return device;
 }
 
-int gadapter_close(void * user) {
-
-  struct gadapter_device * device = (struct gadapter_device *) user;
+int gadapter_close(struct gadapter_device * device) {
 
   gserial_close(device->serial);
 
